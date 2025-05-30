@@ -7,7 +7,6 @@ process TRIMGALORE {
       pattern: "*.txt",
       mode: params.publish_dir_mode
   tag "${ meta.id }"
-  label 'low_cpu_med_memory'
 
   input:
     tuple val(meta), path(reads)
@@ -23,10 +22,11 @@ process TRIMGALORE {
     trim_galore --gzip \
     --cores $task.cpus \
     --phred33 \
+    ${ meta.paired_end ? '--paired' : '' } \
     ${ params.nugen ? '-a AGATCGGAAGAGC' : '' } \
     ${ meta.rrbs && !params.nugen ? '--rrbs' : '' } \
     ${ meta.rrbs && params.non_directional ? '--non_directional' : '' } \
-    ${ meta.paired_end ? '--paired' : '' } \
+    --clip_R1 ${ params.clip } --clip_R2 ${ params.clip } --three_prime_clip_R1 ${ params.clip } --three_prime_clip_R2 ${ params.clip } \
     $reads \
     --output_dir .
 

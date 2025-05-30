@@ -47,11 +47,11 @@ if (params.help) {
 ////////////////////////////////////////////////////
 /* --              DEBUG WARNING               -- */
 ////////////////////////////////////////////////////
-if ( params.truncateTo || ! params.stageLocal ) {
+if ( params.truncate_to ) {
 
     println( "\n    WARNING WARNING: DEBUG OPTIONS ARE ENABLED!\n" )
 
-    params.truncateTo ? println( "        - Truncating reads to first ${ params.truncateTo } records" ) : null
+    params.truncate_to ? println( "        - Truncating reads to first ${ params.truncate_to } records" ) : null
 
     println ""
 
@@ -84,11 +84,9 @@ include { SAMTOOLS_SORT as SORT_DEDUPED_BAM } from './modules/samtools.nf' addPa
 include { TO_PRED; TO_BED } from './modules/ucsc.nf'
 include { GENES_TO_TRANSCRIPTS } from './modules/genes_to_transcripts.nf'
 
-include { MULTIQC as RAW_MULTIQC } from './modules/multiqc.nf' addParams(MQCLabel:"raw", multiqc_publish_dir: "00-RawData/FastQC_Reports")
-include { MULTIQC as TRIMMED_MULTIQC } from './modules/multiqc.nf' addParams(MQCLabel:"trimmed", multiqc_publish_dir: "01-TrimFilter/FastQC_Reports")
-include { MULTIQC as TRIM_MULTIQC } from './modules/multiqc.nf' addParams(MQCLabel:"trimming", multiqc_publish_dir: "01-TrimFilter/Trimming_Reports")
+include { MULTIQC as RAW_MULTIQC } from './modules/multiqc.nf' addParams(MQCLabel:"raw", multiqc_publish_dir: "00-RawData/FastQC_Reports/raw_multiqc_report")
+include { MULTIQC as TRIMMED_MULTIQC } from './modules/multiqc.nf' addParams(MQCLabel:"trimmed", multiqc_publish_dir: "01-TrimFilter/Trimmed_Multiqc_Report")
 include { MULTIQC as ALIGN_MULTIQC } from './modules/multiqc.nf' addParams(MQCLabel:"align", multiqc_publish_dir: "04-Bismark_Reports")
-
 
 ch_dp_tools_plugin = params.dp_tools_plugin ? Channel.value(file(params.dp_tools_plugin)) : Channel.value(file("$projectDir/bin/dp_tools__methylseq_dna"))
 ch_runsheet = params.runsheet_path ? Channel.fromPath(params.runsheet_path) : null
@@ -124,7 +122,7 @@ workflow {
     STAGE_RAW_READS.out.raw_reads | TRIMGALORE
 
     if (params.nugen) {
-        TRIMGALORE.out.reads | combine( channel.fromPath( "${ projectDir }/bin/trimRRBSdiversityAdaptCustomers.py" ) ) | NUGEN
+        NUGEN(TRIMGALORE.out.reads, "${ projectDir }/bin/trimRRBSdiversityAdaptCustomers.py")
         NUGEN.out.reads | set { ch_trimmed_reads }
     } else {
         TRIMGALORE.out.reads | set { ch_trimmed_reads }
@@ -132,100 +130,98 @@ workflow {
 
     ch_trimmed_reads | TRIMMED_FASTQC
 
-    STAGE_RAW_READS.out.raw_reads | map { it[0].id }
+    samples | map { it[0].id }
         | collectFile(name: "samples.txt", sort: true, newLine: true, storeDir: "${params.outdir}/${params.gldsAccession}/processing_scripts")
         | set { ch_samples_txt }
 
     RAW_FASTQC.out.zip | map { it -> [ it[1] ] } | flatten | collect | set { raw_mqc_ch }
     RAW_MULTIQC( ch_samples_txt, raw_mqc_ch, ch_multiqc_config )
 
-    TRIMMED_FASTQC.out.zip | map { it -> [ it[1] ] } | flatten | collect | set { trimmed_mqc_ch }
+    TRIMMED_FASTQC.out.zip | map { it -> [ it[1] ] } | flatten | concat( TRIMGALORE.out.reports ) | collect | set { trimmed_mqc_ch }
     TRIMMED_MULTIQC( ch_samples_txt, trimmed_mqc_ch, ch_multiqc_config )
-
-    TRIM_MULTIQC( ch_samples_txt, TRIMGALORE.out.reports | collect, ch_multiqc_config ) 
 
     REFERENCES( ch_meta | map { it.organism_sci } )
     REFERENCES.out.genome_annotations | set { genome_annotations }
 
     BUILD_BISMARK( 
-      genome_annotations, 
+      genome_annotations,
       ch_meta,
       REFERENCES.out.reference_version_and_source
     )
 
-    TO_PRED( 
-      genome_annotations | map { it[1] }, 
-      ch_meta,
-      REFERENCES.out.reference_version_and_source
-    )
+    // TO_PRED( 
+    //   genome_annotations | map { it[1] }, 
+    //   ch_meta,
+    //   REFERENCES.out.reference_version_and_source
+    // )
 
-    TO_BED( 
-      TO_PRED.out, 
-      ch_meta,
-      REFERENCES.out.reference_version_and_source
-    )
+    // TO_BED( 
+    //   TO_PRED.out, 
+    //   ch_meta,
+    //   REFERENCES.out.reference_version_and_source
+    // )
 
-    GENES_TO_TRANSCRIPTS( 
-      genome_annotations | map { it[1] }, 
-      ch_meta,
-      REFERENCES.out.reference_version_and_source
-    )
+    // GENES_TO_TRANSCRIPTS( 
+    //   genome_annotations | map { it[1] }, 
+    //   ch_meta,
+    //   REFERENCES.out.reference_version_and_source
+    // )
 
-    ch_trimmed_reads | combine( BUILD_BISMARK.out.build ) | ALIGN_BISMARK
+    ALIGN_BISMARK( ch_trimmed_reads, BUILD_BISMARK.out.build )
 
-    ALIGN_BISMARK.out.bam | SORT_BAM
+    // ALIGN_BISMARK.out.bam | SORT_BAM
 
-    QUALIMAP(genome_annotations | map { it[1] }, SORT_BAM.out.sorted_bam)
+    // QUALIMAP(genome_annotations | map { it[1] }, SORT_BAM.out.sorted_bam)
 
-    // Dedupe only if not RRBS ch_meta | map { it.rrbs }
-    if ( true ) {
-        ALIGN_BISMARK.out.bam | set { ch_aligned_reads }
-        ch_dedupe_report = Channel.fromPath("NO_FILE") | collect
-    } else {
-        ALIGN_BISMARK.out.bam | DEDUPE
-        DEDUPE.out.bam | set { ch_aligned_reads }
-        ch_dedupe_report = DEDUPE.out.report
+    // // Dedupe only if not RRBS ch_meta | map { it.rrbs }
+    // if ( true ) {
+    //     ALIGN_BISMARK.out.bam | set { ch_aligned_reads }
+    //     ch_dedupe_report = Channel.fromPath("NO_FILE") | collect
+    // } else {
+    //     ALIGN_BISMARK.out.bam | DEDUPE
+    //     DEDUPE.out.bam | set { ch_aligned_reads }
+    //     ch_dedupe_report = DEDUPE.out.report
 
-        DEDUPE.out.bam | SORT_DEDUPED_BAM
-    }
+    //     DEDUPE.out.bam | SORT_DEDUPED_BAM
+    // }
 
-    ch_aligned_reads | combine( BUILD_BISMARK.out.build ) | EXTRACT_CALLS
+    // ch_aligned_reads | combine( BUILD_BISMARK.out.build ) | EXTRACT_CALLS
 
-    BISMARK_REPORT(
-        ch_meta,
-        ALIGN_BISMARK.out.report,
-        ALIGN_BISMARK.out.stats,
-        EXTRACT_CALLS.out.report,
-        EXTRACT_CALLS.out.bias,
-        ch_dedupe_report
-    )
+    // BISMARK_REPORT(
+    //     ch_meta,
+    //     ALIGN_BISMARK.out.report,
+    //     ALIGN_BISMARK.out.stats,
+    //     EXTRACT_CALLS.out.report,
+    //     EXTRACT_CALLS.out.bias,
+    //     ch_dedupe_report
+    // )
 
-    BISMARK_SUMMARY(
-        ALIGN_BISMARK.out.bam | map { it -> [ it[1] ] } | collect,
-        ALIGN_BISMARK.out.report | collect,
-        ALIGN_BISMARK.out.stats | collect,
-        EXTRACT_CALLS.out.report | collect,
-        EXTRACT_CALLS.out.bias | collect,
-        ch_dedupe_report | collect
-    )
+    // BISMARK_SUMMARY(
+    //     ALIGN_BISMARK.out.bam | map { it -> [ it[1] ] } | collect,
+    //     ALIGN_BISMARK.out.report | collect,
+    //     ALIGN_BISMARK.out.stats | collect,
+    //     EXTRACT_CALLS.out.report | collect,
+    //     EXTRACT_CALLS.out.bias | collect,
+    //     ch_dedupe_report | collect
+    // )
 
-    ALIGN_BISMARK.out.report | concat( ALIGN_BISMARK.out.stats ) 
-        | concat( EXTRACT_CALLS.out.report ) 
-        | concat( EXTRACT_CALLS.out.bias )
-        | concat( QUALIMAP.out )
-        | collect 
-        | set { align_mqc_ch }
+    // ALIGN_BISMARK.out.report | concat( ALIGN_BISMARK.out.stats ) 
+    //     | concat( EXTRACT_CALLS.out.report ) 
+    //     | concat( EXTRACT_CALLS.out.bias )
+    //     | concat( QUALIMAP.out )
+    //     | collect 
+    //     | set { align_mqc_ch }
 
-    ALIGN_MULTIQC( ch_samples_txt, align_mqc_ch, ch_multiqc_config )
+    // ALIGN_MULTIQC( ch_samples_txt, align_mqc_ch, ch_multiqc_config )
 
-    DIFF_METHYLATION(
-        channel.fromPath( "${ projectDir }/bin/differential_methylation.R" ),
-        REFERENCES.out.simple_organism_name,
-        EXTRACT_CALLS.out.cov | collect,
-        ch_runsheet,
-        BUILD_BISMARK.out.build,
-        params.reference_table,
-        REFERENCES.out.gene_annotations,
-        REFERENCES.out.reference_version_and_source
-    )
+    // DIFF_METHYLATION(
+    //     "${ projectDir }/bin/differential_methylation.R",
+    //     REFERENCES.out.simple_organism_name,
+    //     EXTRACT_CALLS.out.cov | collect,
+    //     ch_runsheet,
+    //     BUILD_BISMARK.out.build,
+    //     params.reference_table,
+    //     REFERENCES.out.gene_annotations,
+    //     REFERENCES.out.reference_version_and_source
+    // )
 }

@@ -25,7 +25,7 @@ process PARSE_ANNOTATIONS_TABLE {
     simple_organism_name = organisms[organism_key][0]
     fasta_url = organisms[organism_key][5]
     gtf_url = organisms[organism_key][6]
-    annotations_db_url = organisms[organism_key][9]
+    annotations_db_url = organisms[organism_key][10]
     ensemblVersion = organisms[organism_key][3]
     ensemblSource = organisms[organism_key][4]
 
@@ -42,7 +42,7 @@ process PARSE_ANNOTATIONS_TABLE {
 
 process DOWNLOAD_GUNZIP_REFERENCES {
   // Download and decompress genome and annotation files
-  tag "Organism: ${ organism_sci }  Ensembl Version: ${ensemblVersion}"
+  tag "Organism: ${ organism_sci }, Ensembl Version: ${ensemblVersion}"
   label 'networkBound'
   storeDir "${ params.derivedStorePath }/BismarkIndices_BT/${ ref_source }_release${ensemblVersion}/${ organism_sci.capitalize() }"
 
@@ -51,14 +51,11 @@ process DOWNLOAD_GUNZIP_REFERENCES {
     tuple val(ensemblVersion), val(ref_source)
   
   output:
-    tuple path("*.fa"), path("*.gtf")
+    path("*.fa")
 
   script:
   """
   wget ${fasta_url}
-  gunzip *.gz
-
-  wget ${gtf_url}
   gunzip *.gz
   """
 }

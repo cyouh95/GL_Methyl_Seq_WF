@@ -1,12 +1,12 @@
 process BUILD_BISMARK {
-  tag "Refs:${ genomeFasta },${ genomeGtf }, Ensembl.V:${ensemblVersion}"
-  storeDir "${ params.derivedStorePath }/BismarkIndices_BT2/${ ref_source }_release${ensemblVersion}"
+  tag "Refs: ${ genomeFasta }, Ensembl Version: ${ensemblVersion}"
+  storeDir "${ params.derivedStorePath }/BismarkIndices_BT/${ ref_source }_release${ensemblVersion}"
 
   label 'maxCPU'
   label 'big_mem'
 
   input:
-    tuple path(genomeFasta), path(genomeGtf)
+    path(genomeFasta)
     val(meta)
     tuple val(ensemblVersion), val(ref_source) // Used for defining storage location 
 
@@ -16,7 +16,7 @@ process BUILD_BISMARK {
     path("${ meta.organism_sci.capitalize() }/Bisulfite_Genome/")
 
   script:
-    def genome_path = "${ params.derivedStorePath }/BismarkIndices_BT2/${ ref_source }_release${ensemblVersion}/${ meta.organism_sci.capitalize() }"
+    def genome_path = "${ params.derivedStorePath }/BismarkIndices_BT/${ ref_source }_release${ensemblVersion}/${ meta.organism_sci.capitalize() }"
     """
     bam2nuc --genome_folder ${ genome_path } --genomic_composition_only
     bismark_genome_preparation --bowtie2 --parallel ${task.cpus} ${ genome_path }
@@ -28,11 +28,10 @@ process ALIGN_BISMARK {
     mode: params.publish_dir_mode
 
   tag "Sample: ${ meta.id }"
-  label 'maxCPU'
-  label 'align_mem'
 
   input:
-    tuple val( meta ), path( reads ), path(bismark_index_dir)
+    tuple val( meta ), path( reads )
+    path(bismark_index_dir)
 
   output:
     tuple val(meta), path("${ meta.id }/*.bam"), emit: bam
@@ -46,6 +45,7 @@ process ALIGN_BISMARK {
     bismark --bowtie2 \
       --bam \
       --parallel ${task.cpus} \
+      --gzip \
       --non_bs_mm \
       ${ params.non_directional ? '--non_directional' : '' } \
       --nucleotide_coverage \

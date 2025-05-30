@@ -5,11 +5,11 @@ process ISA_TO_RUNSHEET {
         mode: params.publish_dir_mode
 
     input: 
-    path isa_archive
-    path dp_tools_plugin
+        path isa_archive
+        path dp_tools_plugin
 
     output:
-    path "*.csv", emit: runsheet
+        path "*.csv", emit: runsheet
 
     script:
     """

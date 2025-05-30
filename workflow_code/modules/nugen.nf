@@ -7,7 +7,8 @@ process NUGEN {
   label 'low_cpu_med_memory'
 
   input:
-    tuple val(meta), path("input/*"), path("trimRRBSdiversityAdaptCustomers.py")
+    tuple val(meta), path("input/*")
+    path("trimRRBSdiversityAdaptCustomers.py")
 
   output:
     tuple val(meta), path("${ meta.id }*trimmed.fastq.gz"), emit: reads

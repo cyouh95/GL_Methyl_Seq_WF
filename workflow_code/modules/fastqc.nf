@@ -2,9 +2,9 @@ process FASTQC {
   // memory and versioning adapted from https://github.com/nf-core/modules/blob/master/modules/nf-core/fastqc/main.nf
   // FastQC performed on reads
   publishDir "${params.outdir}/${params.gldsAccession}/${params.fastqc_publish_dir}/FastQC_Reports",
+    pattern: '*.{html,zip}',
     mode: params.publish_dir_mode
   tag "${ meta.id }"
-  label 'low_cpu_memory'
 
   input:
     tuple val(meta), path(reads)

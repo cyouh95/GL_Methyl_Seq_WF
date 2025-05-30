@@ -68,6 +68,7 @@ Staging:
         - ISA Field Name: 
             - Parameter Value[Merged Sequence Data File]
             - Characteristics[Merged Sequence Data File]
+            - Parameter Value[Merged Sequence Data]
             - Raw Data File
           ISA Table Source: Assay
           Multiple Values Per Entry: true

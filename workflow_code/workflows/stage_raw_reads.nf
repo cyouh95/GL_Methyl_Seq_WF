@@ -36,7 +36,10 @@ workflow STAGE_RAW_READS {
             ch_raw_reads | COPY_READS
 
         } else {
-            ch_samples | COPY_READS
+            ch_samples | map { it -> it[0].paired_end ? [it[0], [ it[1][0], it[1][1] ]] : [it[0], [it[1][0]]]}
+                | set { ch_raw_reads }
+
+            ch_raw_reads | COPY_READS
         } 
 
     emit:
